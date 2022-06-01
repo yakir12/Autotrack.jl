@@ -70,7 +70,7 @@ function get_spline(imgs, bkgd, ts, guess, smoothing_factor, wr, σ)
 end
 
 function track(start_file, start_time, stop_file, stop_time; 
-    debug = nothing, guess = nothing, 
+    debug = true, guess = nothing, 
     step = 2.0, scale = 10, smoothing_factor = 200, window_radius = 4, σ = 0.85)
 
   if start_file == stop_file
@@ -84,9 +84,8 @@ function track(start_file, start_time, stop_file, stop_time;
   end
 
   ar = VideoIO.aspect_ratio(vid)
-  if !isnothing(debug)
-    save(debug, ts, imgs, spl, ar)
-  end
+
+  debug && save(debug, ts, imgs, spl, ar)
 
   return ts[1], ts[end], spl, scale*[1, ar]
 end
