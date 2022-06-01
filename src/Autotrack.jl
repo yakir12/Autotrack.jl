@@ -69,19 +69,14 @@ function get_spline(imgs, bkgd, ts, guess, smoothing_factor, wr, σ)
   ParametricSpline(ts, hcat(SV.(Tuple.(coords))...); s = smoothing_factor, k = 2)
 end
 
-function track(start_file, start_time, stop_file, stop_time; 
-    debug = true, guess = nothing, 
-    step = 2.0, scale = 10, smoothing_factor = 200, window_radius = 4, σ = 0.85)
+function track(file::AbstractString, start_time::Real, stop_time::Real; 
+    debug = true, guess = nothing, step = 2.0, scale = 10, smoothing_factor = 200, window_radius = 4, σ = 0.85)
 
-  if start_file == stop_file
-    vid = VideoIO.openvideo(start_file, target_format=VideoIO.AV_PIX_FMT_GRAY8)
-    ts = range(start_time, stop_time, step = step)
-    nframes = length(ts)
-    sz, imgs, bkgd = get_imgs(vid, ts, scale, nframes, window_radius)
-    spl = get_spline(imgs, bkgd, ts, isnothing(guess) ? CartesianIndex(sz .÷ 2) : CartesianIndex(guess .÷ scale), smoothing_factor, window_radius, σ)
-  else
-    @error "Currently supports start and stop times in the same single video file"
-  end
+  vid = VideoIO.openvideo(file, target_format=VideoIO.AV_PIX_FMT_GRAY8)
+  ts = range(start_time, stop_time, step = step)
+  nframes = length(ts)
+  sz, imgs, bkgd = get_imgs(vid, ts, scale, nframes, window_radius)
+  spl = get_spline(imgs, bkgd, ts, isnothing(guess) ? CartesianIndex(sz .÷ 2) : CartesianIndex(guess .÷ scale), smoothing_factor, window_radius, σ)
 
   ar = VideoIO.aspect_ratio(vid)
 
