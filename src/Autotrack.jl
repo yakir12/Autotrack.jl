@@ -1,10 +1,10 @@
 module Autotrack
 
 using Dates, LinearAlgebra, Statistics
-using VideoIO, ColorVectorSpace, Dierckx, ImageTransformations, ImageDraw, StaticArrays, PaddedViews, OffsetArrays, ImageFiltering, ColorTypes
+using VideoIO, ColorVectorSpace, Dierckx, ImageTransformations, ImageDraw, StaticArrays, PaddedViews, OffsetArrays, ImageFiltering, ColorTypes, CSV
 SV = SVector{2, Float64}
 
-export track
+export track, track2csv
 
 # include("video.jl")
 # sz = (108, 144)
@@ -30,23 +30,23 @@ end
 #   range(t1, t2, length = nframes)
 # end
 
-function get_next(guess, img, bkgd, wr, σ)
+function get_next(guess, img, bkgd, wr)
   centered_img = OffsetArrays.centered(img, Tuple(guess))
   centered_bkgd = OffsetArrays.centered(bkgd, Tuple(guess))
   w = CartesianIndex(wr, wr)
   window = -w:w
   x = centered_bkgd[window] .- centered_img[window]
-  imfilter!(x, x, Kernel.DoG(σ))
+  imfilter!(x, x, Kernel.DoG(0.85))
   _, i = findmax(x)
   guess + window[i]
 end
 
-function get_imgs(vid, ts, scale, nframes, wr)
+function get_imgs(vid, ts, spatial_step, nframes, wr)
   img = read(vid)
   # t₀ = gettime(vid)
   h, w = size(img)
-  width_ind = 1:scale:w
-  height_ind = 1:scale:h
+  width_ind = 1:spatial_step:w
+  height_ind = 1:spatial_step:h
   sz = (length(height_ind), length(width_ind))
 
   unpadded_imgs = [similar(img, sz) for _ in 1:nframes]
@@ -64,38 +64,47 @@ function get_imgs(vid, ts, scale, nframes, wr)
   return sz, imgs, bkgd
 end
 
-function get_spline(imgs, bkgd, ts, guess, smoothing_factor, wr, σ)
-  coords = accumulate((guess, img) -> get_next(guess, img, bkgd, wr, σ), imgs, init = guess)
+function get_spline(imgs, bkgd, ts, guess, smoothing_factor, wr)
+  coords = accumulate((guess, img) -> get_next(guess, img, bkgd, wr), imgs, init = guess)
   ParametricSpline(ts, hcat(SV.(Tuple.(coords))...); s = smoothing_factor, k = 2)
 end
 
+get_guess(::Missing, sz, _) = CartesianIndex(sz .÷ 2) 
+get_guess(starting_point, _, spatial_step) = CartesianIndex(starting_point .÷ spatial_step)
+
 function track(file::AbstractString, start_time::Real, stop_time::Real; 
-    debug = true, guess = nothing, step = 2.0, scale = 10, smoothing_factor = 200, window_radius = 4, σ = 0.85)
+    csv_file::Union{Nothing, AbstractString} = "tracked", debug_file::Union{Nothing, AbstractString} = "tracked", starting_point::Union{Missing, CartesianIndex{2}} = missing, temporal_step = 2.0, spatial_step = 10, smoothing_factor = 200, window_radius = 4)
 
   vid = VideoIO.openvideo(file, target_format=VideoIO.AV_PIX_FMT_GRAY8)
-  ts = range(start_time, stop_time, step = step)
+  ts = range(start_time, stop_time, step = temporal_step)
   nframes = length(ts)
-  sz, imgs, bkgd = get_imgs(vid, ts, scale, nframes, window_radius)
-  spl = get_spline(imgs, bkgd, ts, isnothing(guess) ? CartesianIndex(sz .÷ 2) : CartesianIndex(guess .÷ scale), smoothing_factor, window_radius, σ)
+  sz, imgs, bkgd = get_imgs(vid, ts, spatial_step, nframes, window_radius)
+  guess = get_guess(starting_point, sz, spatial_step)
+  spl = get_spline(imgs, bkgd, ts, guess, smoothing_factor, window_radius)
 
   ar = VideoIO.aspect_ratio(vid)
 
-  debug && save(debug, ts, imgs, spl, ar)
+  aspect_ratio = spatial_step*[1, ar]
 
-  return ts[1], ts[end], spl, scale*[1, ar]
+  savevid(debug_file, ts, spl, imgs)
+
+  savecsv(csv_file, ts, spl, aspect_ratio)
+
+  return ts[1], ts[end], spl, aspect_ratio
 end
 
-# function get_data(videofile, start, stop)
-#
-#   vid = VideoIO.openvideo(videofile, target_format=VideoIO.AV_PIX_FMT_GRAY8)
-#   ts = get_times(start, stop)
-#   sz, imgs, bkgd = get_imgs(vid, ts)
-#   spl = get_spline(sz, imgs, bkgd, ts)
-#
-#   return ts, imgs, spl, VideoIO.aspect_ratio(vid)
-# end
+function _fun(t, spl, ar)
+  x, y = ar .* spl(t)
+  return (; t, x, y)
+end
 
-function save(result_file, ts, imgs, spl, aspect_ratio)
+savecsv(::Nothing, args...) = nothing
+
+savecsv(csv_file, ts, spl, aspect_ratio::AbstractVector) = CSV.write(csv_file * ".csv", [_fun(t, spl, aspect_ratio) for t in ts])
+
+savevid(::Nothing, args...) = nothing
+
+function savevid(result_file, ts, spl, imgs)
   # ar = SV(1, aspect_ratio)
   # txy = (NamedTuple{(:t, :x, :y)}((t, ar .* spl(t)...)) for t in ts[1] : 1/10 : ts[end])
   # # txy = (NamedTuple{(:t, :x, :y)}((t, spl(t)...)) for t in ts[1] : 1/10 : ts[end])
