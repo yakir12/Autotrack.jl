@@ -100,7 +100,7 @@ end
 
 savecsv(::Nothing, args...) = nothing
 
-savecsv(csv_file, ts, spl, aspect_ratio::AbstractVector) = CSV.write(csv_file * ".csv", [_fun(t, spl, aspect_ratio) for t in ts])
+savecsv(csv_file, ts, spl, aspect_ratio) = CSV.write(csv_file * ".csv", [_fun(t, spl, aspect_ratio) for t in ts])
 
 savevid(::Nothing, args...) = nothing
 
