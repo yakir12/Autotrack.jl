@@ -1,5 +1,7 @@
 # Autotrack
 
+[![DOI](https://zenodo.org/badge/498474687.svg)](https://zenodo.org/doi/10.5281/zenodo.10404734)
+
 A simple auto-tracker for videos of dark beetles walking on a brighter background.
 
 ## Install
