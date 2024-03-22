@@ -4,7 +4,7 @@ using Dates, LinearAlgebra, Statistics
 using VideoIO, ColorVectorSpace, Dierckx, ImageTransformations, ImageDraw, StaticArrays, PaddedViews, OffsetArrays, ImageFiltering, ColorTypes, CSV
 SV = SVector{2, Float64}
 
-export track, track2csv
+export track#, track2csv
 
 # include("video.jl")
 # sz = (108, 144)
@@ -18,6 +18,13 @@ export track, track2csv
 #   m = match(r"(?:(\d+):)*(\d+):(\d+)(?:,(\d+))*", txt)
 #   sum(_parse_time, zip(m.captures, (Hour, Minute, Second, Millisecond)))
 # end
+
+function get_time_zero(file)
+  VideoIO.FFMPEG.ffprobe() do exe
+    txt = read(`$exe  -v error -show_entries format=start_time -of default=noprint_wrappers=1:nokey=1 $file`, String)
+    parse(Float64, txt)
+  end
+end
 
 function seekread!(img, vid, t)
   seek(vid, t)
@@ -76,7 +83,9 @@ function track(file::AbstractString, start_time::Real, stop_time::Real;
     csv_file::Union{Nothing, AbstractString} = "tracked", debug_file::Union{Nothing, AbstractString} = "tracked", starting_point::Union{Missing, CartesianIndex{2}} = missing, temporal_step = 2.0, spatial_step = 10, smoothing_factor = 200, window_radius = 4)
 
   vid = VideoIO.openvideo(file, target_format=VideoIO.AV_PIX_FMT_GRAY8)
-  ts = range(start_time, stop_time, step = temporal_step)
+  t₀ = get_time_zero(file)
+
+  ts = range(start_time + t₀, stop_time + t₀, step = temporal_step)
   nframes = length(ts)
   sz, imgs, bkgd = get_imgs(vid, ts, spatial_step, nframes, window_radius)
   guess = get_guess(starting_point, sz, spatial_step)
