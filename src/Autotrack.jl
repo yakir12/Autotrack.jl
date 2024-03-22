@@ -80,7 +80,7 @@ get_guess(::Missing, sz, _) = CartesianIndex(sz .÷ 2)
 get_guess(starting_point, _, spatial_step) = CartesianIndex(starting_point .÷ spatial_step)
 
 function track(file::AbstractString, start_time::Real, stop_time::Real; 
-    csv_file::Union{Nothing, AbstractString} = "tracked", debug_file::Union{Nothing, AbstractString} = "tracked", starting_point::Union{Missing, CartesianIndex{2}} = missing, temporal_step = 2.0, spatial_step = 10, smoothing_factor = 200, window_radius = 4)
+    csv_file::Union{Nothing, AbstractString} = "tracked", debug_file::Union{Nothing, AbstractString} = "tracked", starting_point::Union{Missing, NTuple{2, Int}} = missing, temporal_step = 2.0, spatial_step = 10, smoothing_factor = 200, window_radius = 4)
 
   vid = VideoIO.openvideo(file, target_format=VideoIO.AV_PIX_FMT_GRAY8)
   t₀ = get_time_zero(file)
